@@ -8,6 +8,8 @@ from django.test.client import Client
 from news.models import News, Comment
 
 
+NEW_COMMENT_TEXT = 'Обновлённый комментарий'
+
 @pytest.fixture
 def author(django_user_model):  
     return django_user_model.objects.create(username='Автор')
@@ -41,7 +43,7 @@ def news():
     return news
 
 @pytest.fixture
-def id_for_args(news):
+def news_id_for_args(news):
     return (news.id,)
 
 @pytest.fixture
@@ -83,3 +85,9 @@ def create_comments(news, author):
         for index in range(10)
     ]
     return Comment.objects.bulk_create(all_comments)
+
+@pytest.fixture
+def form_data():
+    return {
+        'text': NEW_COMMENT_TEXT
+    }

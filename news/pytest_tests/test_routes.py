@@ -14,7 +14,7 @@ from django.urls import reverse
     'name, args',
     (
         ('news:home', None), 
-        ('news:detail', pytest.lazy_fixture('id_for_args')), 
+        ('news:detail', pytest.lazy_fixture('news_id_for_args')), 
         ('users:login', None), 
         ('users:signup', None),
     )
@@ -36,7 +36,7 @@ def test_pages_availability_for_anonymous_user(client, name, args):
 @pytest.mark.parametrize(
     'name, args',
     (
-        ('news:detail', pytest.lazy_fixture('id_for_args')), 
+        ('news:detail', pytest.lazy_fixture('news_id_for_args')), 
         ('users:login', None), 
         ('users:signup', None),
     )
@@ -76,8 +76,8 @@ def test_comment_pages_availability_for_different_users(
 @pytest.mark.parametrize(
     'name, args',
     (
-        ('news:edit', pytest.lazy_fixture('id_for_args')),
-        ('news:delete', pytest.lazy_fixture('id_for_args')),
+        ('news:edit', pytest.lazy_fixture('news_id_for_args')),
+        ('news:delete', pytest.lazy_fixture('news_id_for_args')),
     ),
 )
 def test_redirects(client, name, args):

@@ -26,9 +26,9 @@ def test_news_order(client, create_news):
         assert all_dates == sorted_dates
 
 @pytest.mark.django_db
-def test_comments_order(client, create_comments, id_for_args):
+def test_comments_order(client, create_comments, news_id_for_args):
         """Тестирование очередности комментариев под новостью."""
-        detail_url = reverse('news:detail', args=id_for_args)
+        detail_url = reverse('news:detail', args=news_id_for_args)
         response = client.get(detail_url)
         assert 'news' in response.context
         # Получаем объект новости.
@@ -45,7 +45,7 @@ def test_comments_order(client, create_comments, id_for_args):
 @pytest.mark.parametrize(
     'name, args',
     (
-        ('news:detail', pytest.lazy_fixture('id_for_args')),
+        ('news:detail', pytest.lazy_fixture('news_id_for_args')),
     )
 )
 def test_pages_contains_form(author_client, name, args):
