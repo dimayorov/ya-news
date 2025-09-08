@@ -6,17 +6,17 @@ from django.conf import settings
 from django.test.client import Client
 
 from news.models import News, Comment
-
+from news.forms import BAD_WORDS, WARNING
 
 NEW_COMMENT_TEXT = 'Обновлённый комментарий'
 
 @pytest.fixture
-def author(django_user_model):  
+def author(django_user_model):
     return django_user_model.objects.create(username='Автор')
 
 
 @pytest.fixture
-def reader(django_user_model):  
+def reader(django_user_model):
     return django_user_model.objects.create(username='Читатель')
 
 
@@ -30,7 +30,7 @@ def author_client(author):
 @pytest.fixture
 def reader_client(reader):
     client = Client()
-    client.force_login(reader) 
+    client.force_login(reader)
     return client
 
 
@@ -90,4 +90,10 @@ def create_comments(news, author):
 def form_data():
     return {
         'text': NEW_COMMENT_TEXT
+    }
+
+@pytest.fixture
+def bad_words_data():
+    return {
+        'text': f'Какой-то текст, {BAD_WORDS[0]}, еще текст'
     }

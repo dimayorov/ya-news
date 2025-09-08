@@ -1,23 +1,24 @@
-# news/tests/test_content.py
 from django.conf import settings
 from django.test import TestCase
-# Импортируем функцию reverse(), она понадобится для получения адреса страницы.
 from django.urls import reverse
-# Импортируем функцию для получения модели пользователя.
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from datetime import timedelta
 
-# Дополнительно к News импортируем модель комментария.
 from news.models import Comment, News
-# Импортируем класс формы.
 from news.forms import CommentForm
 
 User = get_user_model()
 
 
 class TestHomePage(TestCase):
-    # Вынесем ссылку на домашнюю страницу в атрибуты класса.
+    """Тестирование содержания.
+
+    1. Количество новостей на главной странице — не более 10.
+    2. Новости отсортированы от самой свежей к самой старой. Свежие новости в
+    начале списка.
+    """
+
     HOME_URL = reverse('news:home')
 
     @classmethod
@@ -42,64 +43,53 @@ class TestHomePage(TestCase):
     def test_news_order(self):
         response = self.client.get(self.HOME_URL)
         object_list = response.context['object_list']
-        # Получаем даты новостей в том порядке, как они выведены на странице.
         all_dates = [news.date for news in object_list]
-        # Сортируем полученный список по убыванию.
         sorted_dates = sorted(all_dates, reverse=True)
-        # Проверяем, что исходный список был отсортирован правильно.
-        self.assertEqual(all_dates, sorted_dates) 
+        self.assertEqual(all_dates, sorted_dates)
 
 
 class TestDetailPage(TestCase):
+    """Тестирование содержания.
+
+    3. Комментарии на странице отдельной новости отсортированы в
+    хронологическом порядке: старые в начале списка, новые — в конце.
+    4. Анонимному пользователю недоступна форма для отправки комментария на
+    странице отдельной новости, а авторизованному доступна.
+    """
 
     @classmethod
     def setUpTestData(cls):
         cls.news = News.objects.create(
-            title='Тестовая новость', 
+            title='Тестовая новость',
             text='Просто текст.',
         )
-        # Сохраняем в переменную адрес страницы с новостью:
         cls.detail_url = reverse('news:detail', args=(cls.news.id,))
         cls.author = User.objects.create(username='Комментатор')
-        # Запоминаем текущее время:
         now = timezone.now()
-        # Создаём комментарии в цикле.
         for index in range(10):
-            # Создаём объект и записываем его в переменную.
             comment = Comment.objects.create(
-                news=cls.news, 
-                author=cls.author, 
+                news=cls.news,
+                author=cls.author,
                 text=f'Tекст {index}',
             )
-            # Сразу после создания меняем время создания комментария.
             comment.created = now + timedelta(days=index)
-            # И сохраняем эти изменения.
             comment.save()
 
     def test_comments_order(self):
         response = self.client.get(self.detail_url)
-        # Проверяем, что объект новости находится в словаре контекста
-        # под ожидаемым именем - названием модели.
         self.assertIn('news', response.context)
-        # Получаем объект новости.
         news = response.context['news']
-        # Получаем все комментарии к новости.
         all_comments = news.comment_set.all()
-        # Собираем временные метки всех комментариев.
         all_timestamps = [comment.created for comment in all_comments]
-        # Сортируем временные метки, менять порядок сортировки не надо.
         sorted_timestamps = sorted(all_timestamps)
-        # Проверяем, что временные метки отсортированы правильно.
-        self.assertEqual(all_timestamps, sorted_timestamps) 
+        self.assertEqual(all_timestamps, sorted_timestamps)
 
     def test_anonymous_client_has_no_form(self):
         response = self.client.get(self.detail_url)
         self.assertNotIn('form', response.context)
-        
+
     def test_authorized_client_has_form(self):
-        # Авторизуем клиент при помощи ранее созданного пользователя.
         self.client.force_login(self.author)
         response = self.client.get(self.detail_url)
         self.assertIn('form', response.context)
-        # Проверим, что объект формы соответствует нужному классу формы.
         self.assertIsInstance(response.context['form'], CommentForm)

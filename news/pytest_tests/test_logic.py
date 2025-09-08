@@ -1,17 +1,60 @@
 import pytest
 from pytest_django.asserts import assertRedirects, assertFormError
-from pytils.translit import slugify
 from http import HTTPStatus
 
 from django.urls import reverse
 
 from news.forms import WARNING
-from news.models import News, Comment
+from news.models import Comment
 
+
+@pytest.mark.django_db
+def test_anonymous_user_cant_create_comment(
+    client, form_data, news_id_for_args
+):
+    """Тест на создание комментария к новости анонимным пользователем."""
+    url = reverse('news:detail', args=news_id_for_args)
+    response = client.post(url, data=form_data)
+    login_url = reverse('users:login')
+    expected_url = f'{login_url}?next={url}'
+    assertRedirects(response, expected_url)
+    assert Comment.objects.count() == 0
+
+@pytest.mark.django_db
+def test_user_can_create_comment(
+    author_client, form_data, news_id_for_args, comment
+):
+    """Тест на создание комментария к новости авторизованным пользователем."""
+    url = reverse('news:detail', args=news_id_for_args)
+    expected_url = url + '#comments'
+    response = author_client.post(url, data=form_data)
+    assertRedirects(response, expected_url)
+    assert Comment.objects.count() == 2
+    comment_from_db = Comment.objects.get(id=comment.id)
+    comment.refresh_from_db()
+    assert comment.text == comment_from_db.text
+    assert comment.news == comment_from_db.news
+    assert comment.author == comment_from_db.author
+
+def test_user_cant_use_bad_words(
+    author_client, news_id_for_args, bad_words_data,
+):
+        """Тест на невозможность создания комментария с плохими словами."""
+        url = reverse('news:detail', args=news_id_for_args)
+        response = author_client.post(url, data=bad_words_data)
+        form = response.context['form']
+        assertFormError(
+            form=form,
+            field='text',
+            errors=WARNING
+        )
+        comments_count = Comment.objects.count()
+        assert comments_count == 0
 
 def test_author_can_delete_comment(
-        author_client, author, form_data, comment_id_for_args
+        author_client, form_data, comment_id_for_args
 ):
+    """Тест на возможность удаления комментария автором."""
     url = reverse('news:delete', args=comment_id_for_args)
     url_to_comments = reverse('news:detail', args=comment_id_for_args) + '#comments'
     response = author_client.post(url, data=form_data)
@@ -19,84 +62,34 @@ def test_author_can_delete_comment(
     assert response.status_code == HTTPStatus.FOUND
     assert Comment.objects.count() == 0
 
-# # Добавляем маркер, который обеспечит доступ к базе данных:
-# @pytest.mark.django_db
-# def test_anonymous_user_cant_create_note(client, form_data):
-#     url = reverse('notes:add')
-#     # Через анонимный клиент пытаемся создать заметку:
-#     response = client.post(url, data=form_data)
-#     login_url = reverse('users:login')
-#     expected_url = f'{login_url}?next={url}'
-#     # Проверяем, что произошла переадресация на страницу логина:
-#     assertRedirects(response, expected_url)
-#     # Считаем количество заметок в БД, ожидаем 0 заметок.
-#     assert Note.objects.count() == 0 
+def test_author_can_edit_comment(
+        author_client, form_data, comment, comment_id_for_args
+):
+    """Тест на возможность изменения комментария автором."""
+    url = reverse('news:edit', args=comment_id_for_args)
+    url_to_comments = reverse('news:detail', args=comment_id_for_args) + '#comments'
+    response = author_client.post(url, data=form_data)
+    assertRedirects(response, url_to_comments)
+    comment.refresh_from_db()
+    comment_from_db = Comment.objects.get(id=comment.id)
+    assert comment.text == comment_from_db.text
 
-# # Вызываем фикстуру отдельной заметки, чтобы в базе появилась запись.
-# def test_not_unique_slug(author_client, note, form_data):
-#     url = reverse('notes:add')
-#     # Подменяем slug новой заметки на slug уже существующей записи:
-#     form_data['slug'] = note.slug
-#     # Пытаемся создать новую заметку:
-#     response = author_client.post(url, data=form_data)
-#     # Проверяем, что в ответе содержится ошибка формы для поля slug:
-#     assertFormError(
-#         response.context['form'], 'slug', errors=(note.slug + WARNING)
-#     )
-#     # Убеждаемся, что количество заметок в базе осталось равным 1:
-#     assert Note.objects.count() == 1 
+def test_user_cant_delete_comment_of_another_user(
+        reader_client, form_data, comment_id_for_args
+):
+    """Тест на невозможность удаления чужого комментария пользователем."""
+    url = reverse('news:delete', args=comment_id_for_args)
+    response = reader_client.post(url, data=form_data)
+    assert response.status_code == HTTPStatus.NOT_FOUND
+    assert Comment.objects.count() == 1
 
-# def test_empty_slug(author_client, form_data):
-#     url = reverse('notes:add')
-#     # Убираем поле slug из словаря:
-#     form_data.pop('slug')
-#     response = author_client.post(url, data=form_data)
-#     # Проверяем, что даже без slug заметка была создана:
-#     assertRedirects(response, reverse('notes:success'))
-#     assert Note.objects.count() == 1
-#     # Получаем созданную заметку из базы:
-#     new_note = Note.objects.get()
-#     # Формируем ожидаемый slug:
-#     expected_slug = slugify(form_data['title'])
-#     # Проверяем, что slug заметки соответствует ожидаемому:
-#     assert new_note.slug == expected_slug 
-
-# def test_author_can_edit_note(author_client, form_data, note):
-#     # Получаем адрес страницы редактирования заметки:
-#     url = reverse('notes:edit', args=(note.slug,))
-#     # В POST-запросе на адрес редактирования заметки
-#     # отправляем form_data - новые значения для полей заметки:
-#     response = author_client.post(url, form_data)
-#     # Проверяем редирект:
-#     assertRedirects(response, reverse('notes:success'))
-#     # Обновляем объект заметки note: получаем обновлённые данные из БД:
-#     note.refresh_from_db()
-#     # Проверяем, что атрибуты заметки соответствуют обновлённым:
-#     assert note.title == form_data['title']
-#     assert note.text == form_data['text']
-#     assert note.slug == form_data['slug'] 
-
-# def test_other_user_cant_edit_note(not_author_client, form_data, note):
-#     url = reverse('notes:edit', args=(note.slug,))
-#     response = not_author_client.post(url, form_data)
-#     # Проверяем, что страница не найдена:
-#     assert response.status_code == HTTPStatus.NOT_FOUND
-#     # Получаем новый объект запросом из БД.
-#     note_from_db = Note.objects.get(id=note.id)
-#     # Проверяем, что атрибуты объекта из БД равны атрибутам заметки до запроса.
-#     assert note.title == note_from_db.title
-#     assert note.text == note_from_db.text
-#     assert note.slug == note_from_db.slug 
-
-# def test_author_can_delete_note(author_client, slug_for_args):
-#     url = reverse('notes:delete', args=slug_for_args)
-#     response = author_client.post(url)
-#     assertRedirects(response, reverse('notes:success'))
-#     assert Note.objects.count() == 0
-
-
-# def test_other_user_cant_delete_note(not_author_client, slug_for_args):
-#     url = reverse('notes:delete', args=slug_for_args)
-#     response = not_author_client.post(url)
-#     assert response.status_code == HTTPStatus.NOT_FOUND
-#     assert Note.objects.count() == 1 
+def test_user_cant_edit_comment_of_another_user(
+        reader_client, form_data, comment_id_for_args, comment
+):
+    """Тест на возможность изменения чужого комментария пользователем."""
+    url = reverse('news:edit', args=comment_id_for_args)
+    response = reader_client.post(url, data=form_data)
+    assert response.status_code == HTTPStatus.NOT_FOUND
+    comment.refresh_from_db()
+    comment_from_db = Comment.objects.get(id=comment.id)
+    assert comment.text == comment_from_db.text

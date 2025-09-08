@@ -4,18 +4,14 @@ from pytest_django.asserts import assertRedirects
 
 from django.urls import reverse
 
-# 3. Страницы удаления и редактирования комментария доступны автору комментария.
-# 4. При попытке перейти на страницу редактирования или удаления комментария анонимный пользователь перенаправляется на страницу авторизации.
-# 5. Авторизованный пользователь не может зайти на страницу редактирования или удаления чужих комментариев (возвращается ошибка 404).
-# 6. Страницы регистрации пользователей, входа в учётную запись и выхода из неё доступны анонимным пользователям.
 
 @pytest.mark.django_db
 @pytest.mark.parametrize(
     'name, args',
     (
-        ('news:home', None), 
-        ('news:detail', pytest.lazy_fixture('news_id_for_args')), 
-        ('users:login', None), 
+        ('news:home', None),
+        ('news:detail', pytest.lazy_fixture('news_id_for_args')),
+        ('users:login', None),
         ('users:signup', None),
     )
 )
@@ -36,8 +32,8 @@ def test_pages_availability_for_anonymous_user(client, name, args):
 @pytest.mark.parametrize(
     'name, args',
     (
-        ('news:detail', pytest.lazy_fixture('news_id_for_args')), 
-        ('users:login', None), 
+        ('news:detail', pytest.lazy_fixture('news_id_for_args')),
+        ('users:login', None),
         ('users:signup', None),
     )
 )
@@ -83,7 +79,7 @@ def test_comment_pages_availability_for_different_users(
 def test_redirects(client, name, args):
     """Тест переадресации анонимного пользователя.
 
-    При попытке перейти на страницу редактирования или удаления комментария 
+    При попытке перейти на страницу редактирования или удаления комментария
     анонимный пользователь перенаправляется на страницу авторизации.
     """
     login_url = reverse('users:login')
